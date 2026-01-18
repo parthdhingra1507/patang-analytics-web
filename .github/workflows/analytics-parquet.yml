@@ -1,0 +1,71 @@
+name: analytics-parquet
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set run id
+        run: echo "RUN_ID=$(date -u +%Y%m%d%H%M%S)" >> "$GITHUB_ENV"
+
+      - name: Restore previous snapshot
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          if gh release view analytics-latest >/dev/null 2>&1; then
+            gh release download analytics-latest -p analytics-parquet.zip -O analytics-parquet.zip
+            unzip -q analytics-parquet.zip
+          else
+            mkdir -p analytics_store
+          fi
+
+      - name: Export Turso to NDJSON
+        env:
+          TURSO_URL: ${{ secrets.TURSO_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          OUTPUT_DIR: analytics_work/ndjson
+          CURSOR_PATH: analytics_store/cursors.json
+          BATCH_SIZE: "1000"
+          MAX_PAGES: "100"
+        run: node scripts/turso-export-ndjson.js
+
+      - name: Install DuckDB
+        run: python -m pip install --no-cache-dir duckdb
+
+      - name: Convert NDJSON to Parquet
+        env:
+          NDJSON_DIR: analytics_work/ndjson
+          PARQUET_DIR: analytics_store/parquet
+          RUN_ID: ${{ env.RUN_ID }}
+        run: python scripts/convert-ndjson-to-parquet.py
+
+      - name: Package snapshot
+        run: |
+          zip -r analytics-parquet.zip analytics_store
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view analytics-latest >/dev/null 2>&1; then
+            gh release upload analytics-latest analytics-parquet.zip --clobber
+          else
+            gh release create analytics-latest analytics-parquet.zip -t analytics-latest -n "Automated analytics snapshot"
+          fi
