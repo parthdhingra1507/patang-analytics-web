@@ -83,20 +83,10 @@ async function loadZip(buffer) {
 }
 
 async function fetchLatestReleaseZip(owner, repo, tag) {
-  const releaseUrl = `https://api.github.com/repos/${owner}/${repo}/releases/tags/${tag}`;
-  const releaseRes = await fetch(releaseUrl);
-  if (!releaseRes.ok) {
-    throw new Error(`Release not found (${releaseRes.status}).`);
-  }
-  const release = await releaseRes.json();
-  const asset = release.assets?.find((item) => item.name === 'analytics-parquet.zip') || release.assets?.[0];
-  if (!asset) {
-    throw new Error('No release asset found.');
-  }
-
-  const assetRes = await fetch(asset.browser_download_url);
+  const downloadUrl = `https://github.com/${owner}/${repo}/releases/download/${tag}/analytics-parquet.zip`;
+  const assetRes = await fetch(downloadUrl);
   if (!assetRes.ok) {
-    throw new Error(`Asset download failed (${assetRes.status}).`);
+    throw new Error(`Release asset not found (${assetRes.status}).`);
   }
   return assetRes.arrayBuffer();
 }
@@ -162,7 +152,7 @@ loadButton.addEventListener('click', async () => {
     return;
   }
 
-  setStatus('Downloading snapshot...');
+  setStatus('Downloading snapshot... (public release)');
   try {
     const buffer = await fetchLatestReleaseZip(owner, repo, tag);
     setStatus('Unpacking snapshot...');
