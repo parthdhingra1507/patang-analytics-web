@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Patang Baazi Analytics Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="bg"></div>
+    <header class="hero">
+      <div class="hero__tag">Patang Baazi v2</div>
+      <h1>Analytics Lab</h1>
+      <p>
+        Run SQL in your browser on the hourly Parquet snapshot. No prod impact, no
+        servers.
+      </p>
+    </header>
+
+    <main class="layout">
+      <section class="panel panel--setup">
+        <h2>Load Snapshot</h2>
+        <p class="muted">
+          Pull the latest release or drop the zip file. This never touches your
+          live database.
+        </p>
+
+        <div class="grid">
+          <label>
+            GitHub owner
+            <input id="owner" type="text" placeholder="ziffichess" />
+          </label>
+          <label>
+            Repo name
+            <input id="repo" type="text" placeholder="patang-baazi-v2" />
+          </label>
+          <label>
+            Release tag
+            <input id="tag" type="text" value="analytics-latest" />
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="load-release" class="btn btn--primary">Load Latest Release</button>
+          <label class="btn btn--ghost">
+            Upload Zip
+            <input id="zip-input" type="file" accept=".zip" hidden />
+          </label>
+        </div>
+
+        <div class="status" id="status">Idle</div>
+      </section>
+
+      <section class="panel panel--query">
+        <div class="panel__header">
+          <h2>SQL Console</h2>
+          <div class="panel__meta">Views: analytics_events, users, game_sessions, level_analytics</div>
+        </div>
+        <textarea id="sql" spellcheck="false">SELECT event_type, COUNT(*) AS count
+FROM analytics_events
+GROUP BY event_type
+ORDER BY count DESC
+LIMIT 20;
+</textarea>
+        <div class="actions actions--inline">
+          <button id="run" class="btn btn--primary">Run Query</button>
+          <button id="clear" class="btn btn--ghost">Clear Output</button>
+        </div>
+        <div class="results" id="results"></div>
+      </section>
+
+      <section class="panel panel--tips">
+        <h2>Quick Starts</h2>
+        <div class="tip">
+          <code>SELECT COUNT(*) FROM users;</code>
+        </div>
+        <div class="tip">
+          <code>SELECT AVG(total_play_time_seconds) FROM game_sessions;</code>
+        </div>
+        <div class="tip">
+          <code>SELECT level_number, AVG(play_time_seconds) FROM level_analytics GROUP BY level_number;</code>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>Powered by DuckDB-WASM • Snapshot refreshes hourly</span>
+    </footer>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
