@@ -16,6 +16,12 @@ const tagInput = document.getElementById('tag');
 let db;
 let conn;
 
+const LOCAL_BUNDLE = {
+  mainModule: new URL('./vendor/duckdb/duckdb-browser-mvp.wasm', import.meta.url).toString(),
+  mainWorker: new URL('./vendor/duckdb/duckdb-browser-mvp.worker.js', import.meta.url).toString(),
+  pthreadWorker: null,
+};
+
 const viewSql = `
 CREATE OR REPLACE VIEW analytics_events AS
 SELECT * FROM read_parquet('analytics_store/parquet/analytics_events/*.parquet');
@@ -44,9 +50,19 @@ function setStatus(message, tone = 'info') {
   statusEl.dataset.tone = tone;
 }
 
+async function resolveBundle() {
+  try {
+    const res = await fetch(LOCAL_BUNDLE.mainWorker, { method: 'HEAD' });
+    if (res.ok) return LOCAL_BUNDLE;
+  } catch (err) {
+    // Ignore and fall back to CDN.
+  }
+  return duckdb.selectBundle(duckdb.getJsDelivrBundles());
+}
+
 async function initDuckDB() {
   setStatus('Starting DuckDB engine...');
-  const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+  const bundle = await resolveBundle();
   const worker = new Worker(bundle.mainWorker);
   db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
@@ -83,6 +99,10 @@ async function loadZip(buffer) {
 }
 
 async function fetchLatestReleaseZip(owner, repo, tag) {
+  const localUrl = new URL('./analytics-parquet.zip', window.location.href).toString();
+  const localRes = await fetch(localUrl);
+  if (localRes.ok) return localRes.arrayBuffer();
+
   const downloadUrl = `https://github.com/${owner}/${repo}/releases/download/${tag}/analytics-parquet.zip`;
   const assetRes = await fetch(downloadUrl);
   if (!assetRes.ok) {
