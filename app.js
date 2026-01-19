@@ -15,6 +15,7 @@ const tagInput = document.getElementById('tag');
 
 let db;
 let conn;
+let isReady = false;
 
 const LOCAL_BUNDLE = {
   mainModule: new URL('./vendor/duckdb/duckdb-browser-mvp.wasm', import.meta.url).toString(),
@@ -62,12 +63,19 @@ async function resolveBundle() {
 
 async function initDuckDB() {
   setStatus('Starting DuckDB engine...');
-  const bundle = await resolveBundle();
-  const worker = new Worker(bundle.mainWorker);
-  db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
-  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
-  conn = await db.connect();
-  setStatus('DuckDB ready. Load a snapshot.');
+  try {
+    const bundle = await resolveBundle();
+    const worker = new Worker(bundle.mainWorker);
+    db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
+    await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+    conn = await db.connect();
+    isReady = true;
+    setStatus('DuckDB ready. Load a snapshot.');
+  } catch (err) {
+    isReady = false;
+    setStatus(`DuckDB init failed: ${err.message}`, 'error');
+    throw err;
+  }
 }
 
 function normalizePath(path) {
@@ -92,6 +100,9 @@ async function createViews() {
 }
 
 async function loadZip(buffer) {
+  if (!isReady) {
+    throw new Error('DuckDB is not initialized');
+  }
   const zip = await JSZip.loadAsync(buffer);
   await registerParquetFiles(zip);
   await createViews();
@@ -163,6 +174,10 @@ function renderError(err) {
 }
 
 loadButton.addEventListener('click', async () => {
+  if (!isReady) {
+    setStatus('DuckDB not ready yet. Please wait a moment.', 'error');
+    return;
+  }
   const owner = ownerInput.value.trim();
   const repo = repoInput.value.trim();
   const tag = tagInput.value.trim() || 'analytics-latest';
@@ -183,6 +198,10 @@ loadButton.addEventListener('click', async () => {
 });
 
 zipInput.addEventListener('change', async (event) => {
+  if (!isReady) {
+    setStatus('DuckDB not ready yet. Please wait a moment.', 'error');
+    return;
+  }
   const file = event.target.files[0];
   if (!file) return;
 
